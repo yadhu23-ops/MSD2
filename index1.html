@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threshold — prototype</title>
+<style>
+  :root{
+    --bg:#f7f5f0; --card:#ffffff; --ink:#1d1d1b; --muted:#6a675f; --line:#e3dfd6;
+    --accent:#2f5d50; --accent-soft:#e4efe9;
+    --warn:#9a4a00; --warn-bg:#fff2dd; --warn-line:#f0c987;
+    --note-bg:#f0ecff; --note:#4b3f8f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+  .app{max-width:520px;margin:0 auto;padding:14px 14px 96px}
+  header{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px}
+  h1{font-size:22px;margin:0;letter-spacing:.2px}
+  .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+  h2{font-size:15px;margin:0 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px}
+  .banner{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn);
+    border-radius:12px;padding:10px 12px;font-size:13px;margin:0 0 12px}
+  .banner b{margin-right:4px}
+  .banner div+div{margin-top:3px}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:#fff;
+    color:var(--ink);padding:9px 12px;min-height:42px}
+  button:active{transform:scale(.98)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.ghost{background:transparent}
+  button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .row.split>*{flex:1}
+  input[type=text],input[type=number]{font:inherit;padding:10px 12px;border:1px solid var(--line);
+    border-radius:10px;min-height:42px;flex:1;min-width:0;background:#fff}
+  .row.nowrap{flex-wrap:nowrap}
+  .row.nowrap>button{flex:1;padding-left:8px;padding-right:8px}
+  .row.nowrap>button.fixed{flex:none}
+  .cam{position:relative;background:#111;border-radius:12px;overflow:hidden;margin:10px 0;display:none}
+  .cam.live{display:block}
+  .cam video{width:100%;display:block;max-height:260px;object-fit:cover}
+  .small{font-size:13px;color:var(--muted)}
+  .msg{font-size:13px;color:var(--warn);margin:6px 0 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid button{text-align:left;font-size:13.5px;line-height:1.3;padding:9px 10px;min-height:52px}
+  .grid button span{display:block;font-size:11.5px;color:var(--muted)}
+  .alert{border-radius:14px;padding:13px 14px;margin:0 0 12px;background:var(--warn-bg);
+    border:1.5px solid #e0a34a;color:#6b3300}
+  .alert strong{display:block;font-size:15px;margin-bottom:3px}
+  .facts{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px;margin:8px 0 0}
+  .facts dt{color:var(--muted)} .facts dd{margin:0}
+  .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;
+    padding:2px 9px;font-size:12px;margin-right:4px}
+  .pill.flag{background:var(--warn-bg);color:var(--warn)}
+  .list{list-style:none;margin:0;padding:0}
+  .list li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;
+    padding:9px 0;border-top:1px solid var(--line)}
+  .list li:first-child{border-top:0}
+  .stepper{display:flex;align-items:center;gap:10px}
+  .stepper button{width:42px;padding:0;font-size:20px}
+  .stepper output{min-width:24px;text-align:center;font-weight:600}
+  .big{font-size:26px;font-weight:650;letter-spacing:-.3px;margin:2px 0}
+  .tabs{position:fixed;left:0;right:0;bottom:0;background:#fffefb;border-top:1px solid var(--line);
+    display:flex;justify-content:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+  .tabs .in{display:flex;gap:6px;max-width:520px;width:100%}
+  .tabs button{flex:1;border:0;background:transparent;font-size:13px;min-height:46px;color:var(--muted)}
+  .tabs button.on{background:var(--accent-soft);color:var(--accent);font-weight:650}
+  .sweep-opts{display:flex;gap:5px;margin-top:6px}
+  .sweep-opts button{flex:1;padding:6px 2px;min-height:38px;font-size:13px}
+  .note{background:var(--note-bg);color:var(--note);border-radius:12px;padding:10px 12px;font-size:13px;margin:0 0 12px}
+  footer{font-size:12px;color:var(--muted);margin:14px 2px 0}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <h1>Threshold</h1>
+      <div class="sub">An unpacking companion · prototype</div>
+    </div>
+    <button id="muteBtn" class="ghost" data-action="mute" aria-label="Sound and vibration">Sound on</button>
+  </header>
+
+  <div id="banner"></div>
+
+  <!-- SCAN -->
+  <section id="tab-scan">
+    <div id="alertBox"></div>
+    <div class="card">
+      <h2>What are you scanning?</h2>
+      <div class="row split" id="modeRow">
+        <button data-action="mode" data-mode="arrival">Arriving now</button>
+        <button data-action="mode" data-mode="pantry">Already in the pantry</button>
+      </div>
+      <p class="small" id="modeHelp"></p>
+
+      <div class="cam" id="camBox">
+        <video id="cam" playsinline muted></video>
+        <div id="h5reader"></div>
+      </div>
+      <div class="row nowrap" style="margin-top:8px">
+        <button class="primary" id="camBtn" data-action="camToggle">Start camera</button>
+        <button data-action="loose">+ Loose item (no barcode)</button>
+      </div>
+      <p class="msg" id="camMsg" hidden></p>
+
+      <div class="row nowrap" style="margin-top:10px">
+        <input type="text" id="manual" inputmode="numeric" placeholder="Or type the barcode digits" aria-label="Barcode digits">
+        <button class="fixed" data-action="scanManual">Scan</button>
+      </div>
+    </div>
+
+    <div id="resultBox"></div>
+
+    <div class="card">
+      <h2>No camera? Tap an item to scan it</h2>
+      <div class="grid" id="tapGrid"></div>
+      <p class="small" style="margin-top:8px" id="countLine"></p>
+    </div>
+  </section>
+
+  <!-- WEEK -->
+  <section id="tab-week" hidden></section>
+
+  <!-- HOME -->
+  <section id="tab-home" hidden></section>
+
+  <!-- SWEEP -->
+  <section id="tab-sweep" hidden></section>
+
+  <footer>
+    Prototype. It weighs packs, never people, and keeps only the last seven days on this phone.
+    No streaks, no daily scores. Not for managing a medical condition.
+  </footer>
+</div>
+
+<nav class="tabs"><div class="in">
+  <button data-action="tab" data-tab="scan">Scan</button>
+  <button data-action="tab" data-tab="week">This week</button>
+  <button data-action="tab" data-tab="home">Home</button>
+  <button data-action="tab" data-tab="sweep">Sweep</button>
+</div></nav>
+
+<script>
+/* ====================================================================
+   EDIT HERE 1 — THE PRODUCT TABLE
+   Replace the sample rows with ~15 real products. Copy every number from
+   the pack's own label. Fields:
+     barcode        the digits printed under the barcode (EAN-13 etc.)
+     name           what you want to see on screen
+     packG          pack weight in g (use ml ≈ g for drinks)
+     sugarPer100    sugars, g per 100 g or 100 ml (from the nutrition panel)
+     sodiumMgPer100 sodium, mg per 100 g or 100 ml (if the pack lists salt in g,
+                    sodium mg = salt g x 400)
+     claim          the health-sounding claim on the front ("" if none)
+   Delete the line  sample:true  on a row once the values are real.
+   ==================================================================== */
+const PRODUCTS = [
+  {barcode:"9990000000001", name:"Kellogg's Choco Millet Muesli", packG:400, sugarPer100:20.8, sodiumMgPer100:236, claim:"High fibre, source of Protein"},
+  {barcode:"9990000000002", name:"SuperYou 10g Protein Wafer Bar", packG:40, sugarPer100:8.85, sodiumMgPer100:442.5, claim:"No \"added\" sugar, Made with Jowar and Atta"},
+  {barcode:"9990000000003", name:"Maaza Real Mango Fruit Drink", packG:1750, sugarPer100:14.9, sodiumMgPer100:21.9, claim:"Real Mango"},
+  {barcode:"9990000000004", name:"MAGGI 2-Minute Instant Noodles", packG:70, sugarPer100:1.8, sodiumMgPer100:1000, claim:"made with quality spices & goodness of Iron, \"Truly good\""},
+  {barcode:"9990000000005", name:"Cadbury Oreo Strawberry Flavour", packG:41.75, sugarPer100:38.5, sodiumMgPer100:420, claim:"Made with real cocoa"},
+  {barcode:"9990000000006", name:"Coca Cola Can", packG:300, sugarPer100:10.6, sodiumMgPer100:8.5, claim:""},
+  {barcode:"9990000000007", name:"Haldiram's Bhujia", packG:200, sugarPer100:0, sodiumMgPer100:771, claim:""},
+  {barcode:"9990000000008", name:"Nutella Hazelnut Spread With Cocoa", packG:350, sugarPer100:56.3, sodiumMgPer100:0, claim:"No preservatives, No hydrogenated fats, No colorings"},
+  {barcode:"9990000000009", name:"Kissan Fresh Tomato Ketchup", packG:1000, sugarPer100:29.8, sodiumMgPer100:941, claim:"Fresh, Made with 100% Real Tomatoes"},
+  {barcode:"9990000000010", name:"Epigamia Kids Yogurt | Strawberry", packG:80, sugarPer100:12.5, sodiumMgPer100:33.75, claim:"Rich in Vitamin D, with pre and probiotics, Source of dietary fibre"},
+  {barcode:"9990000000011", name:"India Gate Everyday Basmati Rice", packG:1000, sugarPer100:0, sodiumMgPer100:0.5, claim:""},
+  {barcode:"9990000000012", name:"Tata Simply Better High Fibre Khapli Wheat Flour", packG:1000, sugarPer100:3.1, sodiumMgPer100:8.2, claim:""},
+  {barcode:"9990000000013", name:"Too Yumm Kashmiri Chilli Potato Chips", packG:52, sugarPer100:2.9, sodiumMgPer100:630, claim:"No palm oil, 40% less saturated fat"},
+  {barcode:"9990000000014", name:"Smith & Jones Peri Peri Masala", packG:14, sugarPer100:17.8, sodiumMgPer100:13153, claim:"Naya zamane ka chaat masala"},
+  {barcode:"9990000000015", name:"Cadbury 5 Star Chocolatey Bar", packG:35.2, sugarPer100:55.5, sodiumMgPer100:170, claim:""}
+];
+
+/* ====================================================================
+   EDIT HERE 2 — CUTOFFS AND ALLOWANCES (UPDATED)
+   Cutoffs: Chilean Warning Octagon Phase 3 models (tested for India).
+   Allowances: WHO Daily Intake Guidelines for adults (2000 kcal ref).
+   ==================================================================== */
+const CONFIG = {
+  placeholders: false, 
+  cutoffs:   { sugarPer100: 10.0, sodiumMgPer100: 400 }, // claim + above these = flagged
+  allowance: { sugarGPerDay: 50, sodiumMgPerDay: 2000,   // based on WHO standard limit
+               weights: { adult: 1, teen: 1, child: 0.7 } } // child scaled for ~1400 kcal
+};
+
+/* ==================== ENGINE (no DOM; tested separately) ==================== */
+// ENGINE-START
+const TSP_G = 4;                       // grams of sugar per teaspoon
+const DAY = 864e5;
+function norm(code){ return String(code||'').replace(/\D/g,'').replace(/^0+/,''); }
+function findProduct(products, code){
+  const n = norm(code); if(!n) return null;
+  return products.find(p => norm(p.barcode) === n) || null;
+}
+function packSugarG(p){ return p.sugarPer100 * p.packG / 100; }
+function packSaltG(p){ return p.sodiumMgPer100 * p.packG / 100 * 2.5 / 1000; }
+function flagFor(p, cut){
+  if(!p || !p.claim) return null;
+  const r = [];
+  if(p.sugarPer100 > cut.sugarPer100) r.push({nutrient:'sugar', value:p.sugarPer100, cutoff:cut.sugarPer100, unit:'g'});
+  if(p.sodiumMgPer100 > cut.sodiumMgPer100) r.push({nutrient:'sodium', value:p.sodiumMgPer100, cutoff:cut.sodiumMgPer100, unit:'mg'});
+  return r.length ? r : null;
+}
+function inWeek(records, now){ const c = now - 7*DAY; return records.filter(r => r.ts >= c); }
+function pairs(records, products){ return records.map(r => ({r, p: findProduct(products, r.bc)})); }
+function sumPairs(pr){
+  let sugarG = 0, saltG = 0;
+  for(const {p} of pr){ if(!p) continue; sugarG += packSugarG(p); saltG += packSaltG(p); }
+  return {sugarG, saltG};
+}
+function rankItems(pr, nutrient){
+  const map = new Map(); let total = 0;
+  for(const {p} of pr){
+    if(!p) continue;
+    const a = nutrient === 'salt' ? packSaltG(p) : packSugarG(p);
+    total += a;
+    const k = norm(p.barcode) || p.name;
+    const e = map.get(k) || {name:p.name, amount:0, count:0};
+    e.amount += a; e.count += 1; map.set(k, e);
+  }
+  const list = [...map.values()].sort((a,b) => b.amount - a.amount);
+  const top = list.slice(0,3);
+  const topSum = top.reduce((s,e) => s + e.amount, 0);
+  return {list, top, total, share: total > 0 ? topSum/total : 0};
+}
+function dailyAllowance(h, A){
+  const w = h.adults*A.weights.adult + h.teens*A.weights.teen + h.children*A.weights.child;
+  return {people: h.adults + h.teens + h.children,
+          sugarG: w*A.sugarGPerDay, saltG: w*A.sodiumMgPerDay*2.5/1000};
+}
+function daysWorth(supply, daily){ return daily > 0 ? supply/daily : null; }
+const STEPS = {full:[0.875,1], threeq:[0.625,0.875], half:[0.375,0.625], quarter:[0.125,0.375], gone:[0,0.125]};
+function sweepEstimate(pr, answers){
+  let sLo=0,sHi=0,tLo=0,tHi=0,answered=0,unanswered=0;
+  for(const {r,p} of pr){
+    if(!p) continue;
+    const a = answers[r.id];
+    if(!a || !STEPS[a]){ unanswered++; continue; }
+    answered++;
+    const [rl, rh] = STEPS[a];
+    sLo += packSugarG(p)*(1-rh); sHi += packSugarG(p)*(1-rl);
+    tLo += packSaltG(p)*(1-rh);  tHi += packSaltG(p)*(1-rl);
+  }
+  return {sugarG:[sLo,sHi], saltG:[tLo,tHi], answered, unanswered};
+}
+// ENGINE-END
+
+/* ==================== STATE ==================== */
+const KEY = 'threshold-proto-v1';
+function defaultState(){ return {household:null, records:[], unscanned:[], lookAgain:[], sweep:{}, muted:false, mode:'arrival', nutrient:'sugar', tab:'scan'}; }
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s) return Object.assign(defaultState(), s); }catch(e){}
+  return defaultState();
+}
+let state = load();
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function purge(){
+  const c = Date.now() - 7*DAY;
+  state.records = state.records.filter(r => r.ts >= c);
+  state.unscanned = state.unscanned.filter(t => t >= c);
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+/* ==================== HELPERS ==================== */
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function tsp(g){ const t = g / TSP_G; return (Math.round(t*2)/2).toString(); }
+function g1(x){ return (Math.round(x*10)/10).toString(); }
+function half(x){ return (Math.round(x*2)/2).toString(); }
+function arrivalsNow(){ return pairs(inWeek(state.records, Date.now()).filter(r => r.mode === 'arrival'), PRODUCTS); }
+function stockNow(){ return pairs(inWeek(state.records, Date.now()), PRODUCTS); }
+function supplyDays(){
+  if(!state.household) return null;
+  const d = dailyAllowance(state.household, CONFIG.allowance);
+  if(!d.people) return null;
+  const s = sumPairs(arrivalsNow());
+  return {sugar: daysWorth(s.sugarG, d.sugarG), salt: daysWorth(s.saltG, d.saltG), people: d.people};
+}
+
+/* ==================== FEEDBACK ==================== */
+let audioCtx = null;
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.22].forEach(t => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 520;
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + t + 0.16);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.18);
+    });
+  }catch(e){}
+}
+function nudge(){
+  if(state.muted) return;
+  beep();
+  try{ if(navigator.vibrate) navigator.vibrate([120,70,120]); }catch(e){}
+}
+
+/* ==================== SCAN LOGIC ==================== */
+let lastResult = null, lastCode = '', lastAt = 0;
+function onCode(code){
+  const now = Date.now();
+  if(code === lastCode && now - lastAt < 2500) return;
+  lastCode = code; lastAt = now;
+  recordScan(code);
+}
+function recordScan(code){
+  purge();
+  const p = findProduct(PRODUCTS, code);
+  const mode = state.mode;
+  const before = supplyDays();
+  state.records.push({id: uid(), ts: Date.now(), bc: String(code), mode});
+  const after = supplyDays();
+  const res = {code, p, mode, unknown: !p, reasons: null, tips: []};
+  if(p){
+    res.reasons = flagFor(p, CONFIG.cutoffs);
+    if(mode === 'arrival'){
+      if(before && after){
+        if(before.sugar < 7 && after.sugar >= 7) res.tips.push('sugar');
+        if(before.salt  < 7 && after.salt  >= 7) res.tips.push('salt');
+      }
+      if(res.reasons || res.tips.length){
+        if(!state.lookAgain.some(x => norm(x.bc) === norm(p.barcode)))
+          state.lookAgain.push({bc: p.barcode, name: p.name, why: res.reasons ? 'claim vs content' : 'tipped the week', ts: Date.now()});
+        nudge();
+      }
+    }
+  }
+  lastResult = res;
+  save(); renderAll();
+}
+function addLoose(){ purge(); state.unscanned.push(Date.now()); save(); renderAll(); }
+
+/* ==================== CAMERA ==================== */
+let camStream = null, detector = null, loopOn = false, h5 = null;
+function setCamMsg(t){ const m = $('camMsg'); m.textContent = t || ''; m.hidden = !t; }
+function camUI(on){
+  $('camBox').classList.toggle('live', on);
+  $('camBtn').textContent = on ? 'Stop camera' : 'Start camera';
+  $('camBtn').classList.toggle('primary', !on);
+}
+function loadScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+async function startCamera(){
+  setCamMsg('');
+  if(!window.isSecureContext){
+    setCamMsg('The camera needs an https:// address (or localhost). You can still tap an item or type a barcode.');
+    return;
+  }
+  const video = $('cam');
+  try{
+    if('BarcodeDetector' in window){
+      const supported = await BarcodeDetector.getSupportedFormats();
+      const want = ['ean_13','ean_8','upc_a','upc_e','code_128'].filter(f => supported.includes(f));
+      if(want.length){
+        detector = new BarcodeDetector({formats: want});
+        camStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}, audio:false});
+        video.srcObject = camStream; video.hidden = false; await video.play();
+        $('h5reader').hidden = true; loopOn = true; camUI(true); tick(); return;
+      }
+    }
+  }catch(e){ stopCamera(); }
+  try{
+    await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
+    video.hidden = true; $('h5reader').hidden = false;
+    const F = window.Html5QrcodeSupportedFormats;
+    const cfg = F ? {formatsToSupport:[F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128], verbose:false} : {verbose:false};
+    h5 = new Html5Qrcode('h5reader', cfg);
+    await h5.start({facingMode:'environment'}, {fps:10, qrbox:{width:260, height:140}}, txt => onCode(txt), () => {});
+    camUI(true);
+  }catch(e){
+    camUI(false);
+    setCamMsg('The camera could not start (permission denied, or the scanning library needs internet). Tap an item or type a barcode instead.');
+  }
+}
+async function tick(){
+  if(!loopOn) return;
+  try{ const c = await detector.detect($('cam')); if(c.length) onCode(c[0].rawValue); }catch(e){}
+  setTimeout(tick, 250);
+}
+async function stopCamera(){
+  loopOn = false;
+  if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  if(h5){ try{ await h5.stop(); }catch(e){} try{ h5.clear(); }catch(e){} h5 = null; }
+  camUI(false);
+}
+
+/* ==================== RENDER ==================== */
+function renderBanner(){
+  const msgs = [];
+  if(PRODUCTS.some(p => p.sample)) msgs.push('<b>Sample data.</b>Replace the product table with values from your own packs.');
+  if(CONFIG.placeholders) msgs.push('<b>Placeholder numbers.</b>Cutoffs and allowances are not from any source yet.');
+  $('banner').innerHTML = msgs.length ? '<div class="banner">' + msgs.map(m => '<div>' + m + '</div>').join('') + '</div>' : '';
+}
+function renderModeRow(){
+  document.querySelectorAll('#modeRow button').forEach(b => b.classList.toggle('on', b.dataset.mode === state.mode));
+  $('modeHelp').textContent = state.mode === 'arrival'
+    ? 'Counts toward this week’s supply, and can flag an item.'
+    : 'Counts as stock only. It is not added to this week’s arrivals and never flags.';
+}
+function renderAlert(){
+  const r = lastResult, box = $('alertBox');
+  if(!r || !r.p || r.mode !== 'arrival' || !(r.reasons || r.tips.length)){ box.innerHTML = ''; return; }
+  let html = '<div class="alert" role="alert">';
+  if(r.reasons){
+    const rs = r.reasons.map(x => x.nutrient + ' is ' + g1(x.value) + ' ' + x.unit + ' per 100 g (cutoff ' + g1(x.cutoff) + ')').join('; ');
+    html += '<strong>Look again: ' + esc(r.p.name) + '</strong>It says “' + esc(r.p.claim) + '”, and its ' + esc(rs) + '.';
+  }
+  if(r.tips.length){
+    const what = r.tips.map(t => t === 'sugar' ? 'sugar' : 'salt').join(' and ');
+    html += (r.reasons ? '<br><br>' : '<strong>This item tips the week</strong>') +
+      'With it, this week’s arrivals hold more than a week’s worth of ' + what + ' for your household.';
+  }
+  html += '<br><span class="small">Added to your “look again” list for the next order.</span></div>';
+  box.innerHTML = html;
+}
+function renderResult(){
+  const r = lastResult, box = $('resultBox');
+  if(!r){ box.innerHTML = ''; return; }
+  if(r.unknown){
+    box.innerHTML = '<div class="card"><h2>Not in the table</h2><p class="small" style="margin:0">Barcode ' + esc(r.code) +
+      '. Logged as unknown and never assumed safe. It is not counted in any total.</p></div>';
+    return;
+  }
+  const p = r.p;
+  const tags = (r.mode === 'pantry' ? '<span class="pill">Pantry stock</span>' : '<span class="pill">Arrived</span>') +
+               (r.reasons && r.mode === 'arrival' ? '<span class="pill flag">Claim vs content</span>' : '');
+  box.innerHTML = '<div class="card"><div>' + tags + '</div><h2 style="margin-top:8px">' + esc(p.name) + '</h2>' +
+    '<dl class="facts">' +
+    '<dt>On the front</dt><dd>' + (p.claim ? '“' + esc(p.claim) + '”' : 'no health claim') + '</dd>' +
+    '<dt>Per 100 g</dt><dd>sugar ' + g1(p.sugarPer100) + ' g · sodium ' + g1(p.sodiumMgPer100) + ' mg</dd>' +
+    '<dt>Whole pack</dt><dd>about ' + tsp(packSugarG(p)) + ' teaspoons of sugar · ' + g1(packSaltG(p)) + ' g salt</dd>' +
+    '</dl></div>';
+}
+function renderCounts(){
+  const wk = inWeek(state.records, Date.now());
+  const pr = pairs(wk, PRODUCTS);
+  const known = pr.filter(x => x.p && x.r.mode === 'arrival').length;
+  const pantry = pr.filter(x => x.p && x.r.mode === 'pantry').length;
+  const unknown = pr.filter(x => !x.p).length;
+  $('countLine').textContent = 'Last seven days: ' + known + ' arrived · ' + pantry + ' pantry · ' + unknown +
+    ' unknown · ' + state.unscanned.length + ' loose, unscanned.';
+}
+function buildTapGrid(){
+  $('tapGrid').innerHTML = PRODUCTS.map((p,i) =>
+    '<button data-action="tap" data-i="' + i + '">' + esc(p.name.replace(/^Sample · /,'')) +
+    '<span>' + (p.claim ? '“' + esc(p.claim) + '”' : 'no claim') + '</span></button>').join('');
+}
+function renderWeek(){
+  const arr = arrivalsNow();
+  const flagged = arr.filter(x => x.p && flagFor(x.p, CONFIG.cutoffs)).length;
+  const n = state.nutrient;
+  const rk = rankItems(arr, n);
+  const supply = supplyDays();
+  const inTen = Math.round(rk.share * 10);
+  let html = '';
+  html += '<div class="card"><h2>This week’s arrivals</h2><div class="big">' + arr.filter(x => x.p).length + ' items</div>' +
+          '<p class="small" style="margin:0">' + flagged + ' of them carry a claim and sit above a cutoff.</p></div>';
+
+  html += '<div class="card"><h2>Which few items supplied most?</h2>' +
+    '<div class="row split" style="margin-bottom:10px">' +
+    '<button data-action="nutrient" data-n="sugar" class="' + (n === 'sugar' ? 'on' : '') + '">Sugar</button>' +
+    '<button data-action="nutrient" data-n="salt" class="' + (n === 'salt' ? 'on' : '') + '">Salt</button></div>';
+  if(rk.total <= 0){
+    html += '<p class="small" style="margin:0">Nothing has arrived yet. Scan something on the Scan tab, or load the demo week on the Home tab.</p>';
+  }else{
+    html += '<p style="margin:0 0 6px">The top ' + rk.top.length + ' supplied about <b>' + inTen + ' in 10</b> of this week’s ' + (n === 'sugar' ? 'sugar' : 'salt') + '.</p><ul class="list">' +
+      rk.top.map(e => '<li><span>' + esc(e.name) + (e.count > 1 ? ' × ' + e.count : '') + '</span><span>' +
+        (n === 'sugar' ? 'about ' + tsp(e.amount) + ' tsp' : g1(e.amount) + ' g') + '</span></li>').join('') + '</ul>';
+  }
+  html += '</div>';
+
+  html += '<div class="card"><h2>Supply against your household’s allowance</h2>';
+  if(!supply){
+    html += '<p class="small" style="margin:0">Tell it who lives here on the Home tab, and it will compare supply with an allowance.</p>';
+  }else{
+    html += '<p style="margin:0 0 4px">This week’s arrivals hold about</p>' +
+      '<div class="big">' + half(supply.sugar) + ' days’ worth of sugar</div>' +
+      '<div class="big">' + half(supply.salt) + ' days’ worth of salt</div>' +
+      '<p class="small" style="margin:6px 0 0">for ' + supply.people + ' ' + (supply.people === 1 ? 'person' : 'people') +
+      ' (a week is 7). This is supply, not what anyone ate.</p>';
+  }
+  html += '</div>';
+
+  html += '<div class="card"><h2>Look again next order</h2>';
+  if(!state.lookAgain.length) html += '<p class="small" style="margin:0">Nothing yet. Items that carry a claim and sit above a cutoff land here.</p>';
+  else html += '<ul class="list">' + state.lookAgain.map(x =>
+    '<li><span>' + esc(x.name) + '<br><span class="small">' + esc(x.why) + '</span></span>' +
+    '<button class="ghost" data-action="unlook" data-bc="' + esc(x.bc) + '">Remove</button></li>').join('') + '</ul>';
+  html += '</div>';
+
+  const unknown = stockNow().filter(x => !x.p).length;
+  html += '<p class="small">Not counted anywhere: ' + unknown + ' unknown barcodes and ' + state.unscanned.length +
+          ' loose items. They are shown so the gap stays visible.</p>';
+  $('tab-week').innerHTML = html;
+}
+function renderHome(){
+  const h = state.household || {adults:1, teens:0, children:0};
+  const row = (label, key) => '<li><span>' + label + '</span><span class="stepper">' +
+    '<button data-action="hh" data-k="' + key + '" data-d="-1" aria-label="fewer">−</button><output>' + h[key] +
+    '</output><button data-action="hh" data-k="' + key + '" data-d="1" aria-label="more">+</button></span></li>';
+  let html = '<div class="card"><h2>Who lives here?</h2><ul class="list">' +
+    row('Adults', 'adults') + row('Teens', 'teens') + row('Children', 'children') + '</ul>';
+  if(state.household){
+    const d = dailyAllowance(state.household, CONFIG.allowance);
+    html += '<p class="small" style="margin:10px 0 0">Household allowance per day: about ' + tsp(d.sugarG) +
+      ' teaspoons of sugar and ' + g1(d.saltG) + ' g of salt. A week is seven of those.</p>';
+  }else{
+    html += '<button class="primary" style="margin-top:10px" data-action="hhSave">Save household</button>' +
+      '<p class="small" style="margin:8px 0 0">Asked once. Until you save it, the app only judges packs.</p>';
+  }
+  html += '</div>';
+  html += '<div class="card"><h2>Demo tools</h2><div class="row">' +
+    '<button data-action="demo">Load a demo week</button>' +
+    '<button data-action="reset">Clear everything</button></div>' +
+    '<p class="small" style="margin:8px 0 0">The demo week fills the last six days from the product table so you can show the ranking, supply and sweep without scanning for a week.</p></div>';
+  $('tab-home').innerHTML = html;
+}
+const STEP_LABELS = {full:'Full', threeq:'¾', half:'½', quarter:'¼', gone:'Gone'};
+function renderSweep(){
+  const pr = stockNow().filter(x => x.p);
+  const est = sweepEstimate(pr, state.sweep);
+  const people = state.household ? dailyAllowance(state.household, CONFIG.allowance) : null;
+  let html = '<div class="note">Mocked layer. Rough on purpose: each answer is a range, and this prototype assumes pantry items were full when you scanned them.</div>';
+  html += '<div class="card"><h2>Estimated use this week</h2>';
+  if(!est.answered){
+    html += '<p class="small" style="margin:0">Answer how much is left of each item below.</p>';
+  }else{
+    html += '<div class="big">about ' + tsp(est.sugarG[0]) + ' to ' + tsp(est.sugarG[1]) + ' teaspoons of sugar</div>' +
+            '<div class="big">about ' + g1(est.saltG[0]) + ' to ' + g1(est.saltG[1]) + ' g of salt</div>';
+    if(people && people.people){
+      html += '<p class="small" style="margin:6px 0 0">That is roughly ' + half(est.sugarG[0] / people.sugarG) + ' to ' +
+        half(est.sugarG[1] / people.sugarG) + ' days’ worth of sugar for ' + people.people + ' ' + (people.people === 1 ? 'person' : 'people') + '.</p>';
+    }
+    html += '<p class="small" style="margin:6px 0 0">An estimate, not a measurement. ' + est.unanswered + ' item' + (est.unanswered === 1 ? '' : 's') + ' not answered yet.</p>';
+  }
+  html += '</div>';
+  html += '<div class="card"><h2>How much is left?</h2>';
+  if(!pr.length) html += '<p class="small" style="margin:0">Nothing scanned in the last seven days.</p>';
+  else html += '<ul class="list">' + pr.map(x =>
+    '<li style="display:block"><div>' + esc(x.p.name) + ' <span class="small">· ' + (x.r.mode === 'pantry' ? 'pantry' : 'arrived') + '</span></div>' +
+    '<div class="sweep-opts">' + Object.keys(STEP_LABELS).map(k =>
+      '<button data-action="sweep" data-id="' + x.r.id + '" data-v="' + k + '" class="' + (state.sweep[x.r.id] === k ? 'on' : '') + '">' + STEP_LABELS[k] + '</button>').join('') +
+    '</div></li>').join('') + '</ul>';
+  html += '</div>';
+  $('tab-sweep').innerHTML = html;
+}
+function renderTabs(){
+  ['scan','week','home','sweep'].forEach(t => { $('tab-' + t).hidden = (t !== state.tab); });
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
+}
+function renderMute(){ $('muteBtn').textContent = state.muted ? 'Sound off' : 'Sound on'; }
+function renderAll(){
+  renderBanner(); renderTabs(); renderMute(); renderModeRow();
+  renderAlert(); renderResult(); renderCounts();
+  if(state.tab === 'week') renderWeek();
+  if(state.tab === 'home') renderHome();
+  if(state.tab === 'sweep') renderSweep();
+}
+
+/* ==================== DEMO WEEK ==================== */
+function seedDemo(){
+  const day = DAY, now = Date.now();
+  const plan = [ // [daysAgo, index in PRODUCTS, mode]
+    [6,10,'pantry'],[6,11,'pantry'],[6,7,'pantry'],[6,8,'pantry'],
+    [4,0,'arrival'],[4,2,'arrival'],[4,10,'arrival'],
+    [3,4,'arrival'],[3,5,'arrival'],[3,5,'arrival'],
+    [2,1,'arrival'],[2,6,'arrival'],[2,3,'arrival'],
+    [1,9,'arrival'],[1,7,'arrival']
+  ];
+  state.records = plan.map(([d,i,m],k) => ({id:'demo'+k, ts: now - d*day + k*1000, bc: PRODUCTS[i % PRODUCTS.length].barcode, mode: m}));
+  state.unscanned = [now - 2*day];
+  state.sweep = {};
+  state.lookAgain = [];
+  state.records.filter(r => r.mode === 'arrival').forEach(r => {
+    const pr = findProduct(PRODUCTS, r.bc);
+    if(pr && flagFor(pr, CONFIG.cutoffs) && !state.lookAgain.some(x => norm(x.bc) === norm(pr.barcode)))
+      state.lookAgain.push({bc: pr.barcode, name: pr.name, why: 'claim vs content', ts: r.ts});
+  });
+  if(!state.household) state.household = {adults:2, teens:0, children:0};
+  lastResult = null;
+  save();
+}
+
+/* ==================== EVENTS ==================== */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]'); if(!el) return;
+  const a = el.dataset.action;
+  if(a === 'tab'){ state.tab = el.dataset.tab; save(); renderAll(); window.scrollTo(0,0); }
+  else if(a === 'mode'){ state.mode = el.dataset.mode; save(); renderModeRow(); }
+  else if(a === 'mute'){ state.muted = !state.muted; save(); renderMute(); }
+  else if(a === 'camToggle'){ (camStream || h5) ? stopCamera() : startCamera(); }
+  else if(a === 'loose'){ addLoose(); }
+  else if(a === 'scanManual'){ const v = $('manual').value.trim(); if(v){ recordScan(v); $('manual').value = ''; } }
+  else if(a === 'tap'){ recordScan(PRODUCTS[+el.dataset.i].barcode); }
+  else if(a === 'nutrient'){ state.nutrient = el.dataset.n; save(); renderWeek(); }
+  else if(a === 'unlook'){ state.lookAgain = state.lookAgain.filter(x => norm(x.bc) !== norm(el.dataset.bc)); save(); renderWeek(); }
+  else if(a === 'hh'){
+    const h = state.household || {adults:1, teens:0, children:0};
+    const k = el.dataset.k, d = +el.dataset.d;
+    h[k] = Math.max(0, Math.min(12, h[k] + d));
+    if(h.adults + h.teens + h.children === 0) h.adults = 1;
+    state.household = h; save(); renderAll();
+  }
+  else if(a === 'hhSave'){ state.household = state.household || {adults:1, teens:0, children:0}; save(); renderAll(); }
+  else if(a === 'sweep'){ state.sweep[el.dataset.id] = el.dataset.v; save(); renderSweep(); }
+  else if(a === 'demo'){ seedDemo(); state.tab = 'week'; renderAll(); }
+  else if(a === 'reset'){ if(confirm('Clear everything stored on this phone?')){ state = defaultState(); lastResult = null; save(); renderAll(); } }
+});
+$('manual').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); document.querySelector('[data-action="scanManual"]').click(); } });
+
+purge(); buildTapGrid(); renderAll();
+</script>
+</body>
+</html>
